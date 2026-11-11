@@ -29,7 +29,9 @@ npm run build
 
 ## GitHub Pages
 
-The Vite base URL is intentionally set to `/Warehouse-Barcode-Studio/`, matching the target public repository. The workflow at `.github/workflows/deploy-pages.yml` runs tests, builds `dist/`, then deploys it with GitHub Pages after Pages is set to **GitHub Actions** in repository settings.
+The Vite base URL is intentionally set to `/Warehouse-Barcode-Studio/`, matching the target public repository. The workflow at `.github/workflows/deploy-pages.yml` runs tests, builds `docs/`, then deploys it with GitHub Pages after Pages is set to **GitHub Actions** in repository settings.
+
+For a resilient static fallback, the production build is also committed in `docs/`. GitHub Pages can therefore publish directly from `main` / `docs` if the account cannot run GitHub Actions. The workflow remains in the repository and will resume CI-based deployment once Actions is available.
 
 ## Printing note
 

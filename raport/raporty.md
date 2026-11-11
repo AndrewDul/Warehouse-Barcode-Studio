@@ -41,3 +41,4 @@ Do generowania liniowych kodów użyto `JsBarcode`, QR tworzy `qrcode`, Excel cz
 - Dodano testy parsera i walidacji. Stan wdrożenia GitHub Pages zostanie dopisany dopiero po rzeczywistym utworzeniu repozytorium, wypchnięciu zmian i zakończeniu CI.
 - Poprawiono zgodność importu typu React z rygorystyczną kompilacją TypeScript przed końcową walidacją builda.
 - Zoptymalizowano pierwszy pakiet: duże moduły importu Excel/Word i eksportu PDF/ZIP są ładowane dopiero przy użyciu danej funkcji.
+- Rzeczywiście utworzono publiczne repozytorium `AndrewDul/Warehouse-Barcode-Studio` i wypchnięto pierwszy commit (`747641e`). GitHub Actions rozpoczęło workflow, lecz konto zgłosiło blokadę rozliczeniową: job nie mógł wystartować. Nie zmieniano danych płatniczych. Wprowadzono bezpieczny fallback GitHub Pages z wersją statyczną w śledzonym folderze `docs/` na `main`; workflow CI pozostaje przygotowany na czas po usunięciu blokady.
