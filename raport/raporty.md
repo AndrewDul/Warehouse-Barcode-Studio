@@ -43,3 +43,12 @@ Do generowania liniowych kodów użyto `JsBarcode`, QR tworzy `qrcode`, Excel cz
 - Zoptymalizowano pierwszy pakiet: duże moduły importu Excel/Word i eksportu PDF/ZIP są ładowane dopiero przy użyciu danej funkcji.
 - Rzeczywiście utworzono publiczne repozytorium `AndrewDul/Warehouse-Barcode-Studio` i wypchnięto pierwszy commit (`747641e`). GitHub Actions rozpoczęło workflow, lecz konto zgłosiło blokadę rozliczeniową: job nie mógł wystartować. Nie zmieniano danych płatniczych. Wprowadzono bezpieczny fallback GitHub Pages z wersją statyczną w śledzonym folderze `docs/` na `main`; workflow CI pozostaje przygotowany na czas po usunięciu blokady.
 - GitHub Pages skonfigurowano jako `main` → `/docs`. Zostało zweryfikowane faktyczne publiczne działanie strony pod adresem `https://andrewdul.github.io/Warehouse-Barcode-Studio/` (HTTP 200 oraz widoczny interfejs aplikacji). Workflow CI nadal ma status failed wyłącznie z powodu blokady rozliczeniowej konta GitHub Actions; hosting statyczny działa niezależnie od tej blokady.
+
+### 2026-11-11 — tryb pojedynczego skanowania i arkusze drukarki biurowej
+
+- Przeniesiono ustawienia druku i eksportu do lewej kolumny, pod polem importu/generowania.
+- Dodano profile zwykłej drukarki: A4 3 × 7 (21 etykiet), A4 2 × 5 (10 dużych etykiet), A5 2 × 4 oraz US Letter 3 × 10. Profile urządzeń etykietowych pozostały dostępne.
+- Druk w przeglądarce i eksport PDF wykorzystują teraz wymiary strony, wymiary pojedynczej etykiety oraz układ kolumn/wierszy. Dla arkuszy biurowych PDF umieszcza wiele etykiet na jednej stronie.
+- Dodano duży panel „Scan one label” nad kolejką: wyświetla pojedynczy kod, licznik pozycji, przyciski poprzedni/następny oraz wyszukiwanie fragmentu wartości kodu bez rozróżniania wielkości liter.
+- Kolejka pod panelem skanowania jest przewijana pionowo i nie wydłuża strony bez końca przy dużych importach. Kliknięcie miniatury wybiera ją również w panelu pojedynczego skanowania.
+- Przed drukiem aktywne wyszukiwanie jest automatycznie czyszczone, aby do drukarki zawsze trafił pełny zestaw prawidłowych etykiet, a nie przypadkowo tylko wyniki filtrowania.

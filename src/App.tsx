@@ -33,6 +33,7 @@ export default function App() {
   const [sourceText, setSourceText] = useState('')
   const [labels, setLabels] = useState<BarcodeLabel[]>([])
   const [selectedId, setSelectedId] = useState<string | undefined>()
+  const [scanQuery, setScanQuery] = useState('')
   const [profile, setProfile] = useState<LabelProfile>(labelProfiles[0])
   const [customSize, setCustomSize] = useState({ width: '100', height: '50' })
   const [notice, setNotice] = useState('Ready for local-only label creation.')
@@ -41,7 +42,13 @@ export default function App() {
 
   const validLabels = useMemo(() => labels.filter((label) => label.valid), [labels])
   const invalidLabels = labels.length - validLabels.length
+  const filteredLabels = useMemo(() => {
+    const query = scanQuery.trim().toLocaleLowerCase()
+    return query ? labels.filter((label) => label.value.toLocaleLowerCase().includes(query)) : labels
+  }, [labels, scanQuery])
   const selectedLabel = labels.find((label) => label.id === selectedId) ?? labels[0]
+  const scanLabel = filteredLabels.find((label) => label.id === selectedId) ?? filteredLabels[0]
+  const scanIndex = scanLabel ? filteredLabels.findIndex((label) => label.id === scanLabel.id) : -1
   const activeProfile = profile.id === 'custom'
     ? { ...profile, widthMm: Number(customSize.width) || 100, heightMm: Number(customSize.height) || 50 }
     : profile
@@ -57,6 +64,7 @@ export default function App() {
     const nextLabels = createLabels(lines, format)
     setLabels(nextLabels)
     setSelectedId(nextLabels[0]?.id)
+    setScanQuery('')
     const errors = nextLabels.filter((label) => !label.valid).length
     setNotice(errors ? `${nextLabels.length} labels created; ${errors} need attention before export.` : `${nextLabels.length} labels created and ready to export.`)
   }
@@ -76,6 +84,7 @@ export default function App() {
       const nextLabels = createLabels(result.lines, format)
       setLabels(nextLabels)
       setSelectedId(nextLabels[0]?.id)
+      setScanQuery('')
       const warning = result.warnings.length ? ` ${result.warnings[0]}` : ''
       setNotice(`${nextLabels.length} non-empty values imported from ${file.name}.${warning}`)
     } catch (error) {
@@ -115,10 +124,42 @@ export default function App() {
       setNotice('Create at least one valid label before printing.')
       return
     }
-    document.documentElement.style.setProperty('--print-width', `${activeProfile.widthMm}mm`)
-    document.documentElement.style.setProperty('--print-height', `${activeProfile.heightMm}mm`)
-    setNotice(`Opening the browser print dialog for ${activeProfile.name}. Select your Zebra ZD220 or another installed printer.`)
-    window.print()
+    const columns = activeProfile.columns ?? 1
+    const rows = activeProfile.rows ?? 1
+    const labelWidth = activeProfile.labelWidthMm ?? activeProfile.widthMm
+    const labelHeight = activeProfile.labelHeightMm ?? activeProfile.heightMm
+    const horizontalGap = Math.max(0, (activeProfile.widthMm - columns * labelWidth) / (columns + 1))
+    const verticalGap = Math.max(0, (activeProfile.heightMm - rows * labelHeight) / (rows + 1))
+    document.documentElement.style.setProperty('--print-page-width', `${activeProfile.widthMm}mm`)
+    document.documentElement.style.setProperty('--print-page-height', `${activeProfile.heightMm}mm`)
+    document.documentElement.style.setProperty('--print-label-width', `${labelWidth}mm`)
+    document.documentElement.style.setProperty('--print-label-height', `${labelHeight}mm`)
+    document.documentElement.style.setProperty('--print-columns', String(columns))
+    document.documentElement.style.setProperty('--print-column-gap', `${horizontalGap}mm`)
+    document.documentElement.style.setProperty('--print-row-gap', `${verticalGap}mm`)
+    const sheetNote = activeProfile.printLayout === 'sheet' ? ` (${columns * rows} labels per page)` : ''
+    setNotice(`Opening the browser print dialog for ${activeProfile.name}${sheetNote}. Choose the matching paper size and an installed printer.`)
+    const openPrintDialog = () => window.requestAnimationFrame(() => window.requestAnimationFrame(() => window.print()))
+    if (scanQuery) {
+      setScanQuery('')
+      openPrintDialog()
+      return
+    }
+    openPrintDialog()
+  }
+
+  function updateScanQuery(query: string): void {
+    setScanQuery(query)
+    const normalized = query.trim().toLocaleLowerCase()
+    if (!normalized) return
+    const firstMatch = labels.find((label) => label.value.toLocaleLowerCase().includes(normalized))
+    if (firstMatch) setSelectedId(firstMatch.id)
+  }
+
+  function moveScan(step: number): void {
+    if (!scanLabel) return
+    const next = filteredLabels[scanIndex + step]
+    if (next) setSelectedId(next.id)
   }
 
   return (
@@ -177,8 +218,8 @@ export default function App() {
               <p className="hint">Excel imports each non-empty cell in workbook order. Word, Markdown and TXT import each non-empty text line.</p>
             </section>
 
-            <section className="panel profile-panel">
-              <div className="panel-heading compact-heading"><div><p className="eyebrow">02 / OUTPUT</p><h2>Label profile</h2></div></div>
+            <section className="panel output-panel">
+              <div className="panel-heading compact-heading"><div><p className="eyebrow">02 / PRINT &amp; EXPORT</p><h2>Output settings</h2></div></div>
               <label className="field-label" htmlFor="profile">Printer / size</label>
               <select id="profile" value={profile.id} onChange={(event) => chooseProfile(event.target.value)}>
                 {labelProfiles.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
@@ -189,42 +230,59 @@ export default function App() {
                 <label>Height <input value={customSize.height} inputMode="decimal" onChange={(event) => setCustomSize({ ...customSize, height: event.target.value })} /><small>mm</small></label>
               </div>}
               <p className="profile-hint">{activeProfile.printerHint} · Browser printing sends the selected dimensions to any installed printer.</p>
+              <div className="output-divider" />
+              <div className="export-heading"><div><p className="eyebrow">FILES &amp; PRINT</p><h3>Finish the label pack</h3></div><span>{selectedLabel ? formatNames[selectedLabel.format] : 'No active label'}</span></div>
+              <p className="export-copy">Files are created only in this browser session. No values are uploaded, stored or logged by this application.</p>
+              <div className="action-grid">
+                <button className="button button-secondary" disabled={!selectedLabel?.valid || busy} onClick={() => selectedLabel && runExport(() => exportOne(selectedLabel, 'png'), 'PNG label downloaded.')}><span>▧</span> PNG</button>
+                <button className="button button-secondary" disabled={!selectedLabel?.valid || busy} onClick={() => selectedLabel && runExport(() => exportOne(selectedLabel, 'svg'), 'SVG label downloaded.')}><span>◇</span> SVG</button>
+                <button className="button button-secondary" disabled={!validLabels.length || busy} onClick={() => runExport(() => exportPdf(validLabels, activeProfile), 'PDF label pack downloaded.')}><span>▤</span> PDF pack</button>
+                <button className="button button-secondary" disabled={!validLabels.length || busy} onClick={() => runExport(() => exportZip(validLabels), 'ZIP with PNG and SVG labels downloaded.')}><span>⇩</span> ZIP pack</button>
+                <button className="button button-primary print-button" disabled={!validLabels.length || busy} onClick={printLabels}><span>⎙</span> Print labels</button>
+              </div>
             </section>
           </aside>
 
-          <section className="panel label-area">
-            <div className="panel-heading labels-heading">
-              <div><p className="eyebrow">03 / PREVIEW</p><h2>Label queue</h2></div>
-              <div className="queue-summary"><b>{validLabels.length}</b> valid <span /> <b className={invalidLabels ? 'warning' : ''}>{invalidLabels}</b> flagged</div>
-            </div>
-            <div className="label-grid" aria-live="polite">
-              {!labels.length && <div className="empty-state"><span className="empty-icon">▦</span><h3>Your label queue is waiting</h3><p>Add your values above or import an Excel, Word, Markdown or text file.</p></div>}
-              {labels.map((label, index) => <button key={label.id} className={`label-card ${label.id === selectedLabel?.id ? 'selected' : ''} ${!label.valid ? 'invalid' : ''}`} onClick={() => setSelectedId(label.id)}>
-                <span className="label-index">{String(index + 1).padStart(2, '0')}</span>
-                <span className="format-chip">{formatNames[label.format]}</span>
-                <BarcodePreview label={label} compact />
-                <span className="label-value" title={label.value}>{label.value}</span>
-                {!label.valid && <span className="validation-message">{label.error}</span>}
-              </button>)}
-            </div>
-          </section>
-        </section>
+          <section className="review-stack">
+            <section className="panel scan-panel">
+              <div className="panel-heading scan-heading">
+                <div><p className="eyebrow">03 / SCAN MODE</p><h2>Scan one label</h2></div>
+                <span className="scan-count">{scanLabel ? `${scanIndex + 1} / ${filteredLabels.length}` : `0 / ${filteredLabels.length}`}</span>
+              </div>
+              <label className="field-label" htmlFor="scan-search">Find a code</label>
+              <div className="scan-search-row"><input id="scan-search" value={scanQuery} onChange={(event) => updateScanQuery(event.target.value)} placeholder="Search any part, e.g. ff or 2026" spellCheck="false" />{scanQuery && <button className="clear-search" onClick={() => setScanQuery('')} aria-label="Clear barcode search">×</button>}</div>
+              <p className="scan-hint">The search matches any part of a code. Use the arrows to show one matching label at a time for scanning.</p>
+              {scanLabel ? <div className="scan-stage">
+                <button className="scan-step" onClick={() => moveScan(-1)} disabled={scanIndex <= 0} aria-label="Show previous barcode">←</button>
+                <article className={`scan-card ${!scanLabel.valid ? 'invalid' : ''}`}>
+                  <div><span className="format-chip">{formatNames[scanLabel.format]}</span><p className="eyebrow">READY TO SCAN</p><h3 title={scanLabel.value}>{scanLabel.value}</h3></div>
+                  <BarcodePreview label={scanLabel} />
+                </article>
+                <button className="scan-step" onClick={() => moveScan(1)} disabled={scanIndex >= filteredLabels.length - 1} aria-label="Show next barcode">→</button>
+              </div> : <div className="scan-empty"><span>⌕</span><h3>No matching code</h3><p>Try a shorter part of the barcode or clear the search.</p></div>}
+            </section>
 
-        <section className="panel export-panel">
-          <div className="selected-preview">
-            <div className="selected-label-meta"><p className="eyebrow">ACTIVE LABEL</p><h2>{selectedLabel ? selectedLabel.value : 'Nothing selected'}</h2><span>{selectedLabel ? formatNames[selectedLabel.format] : 'Create a label to start'}</span></div>
-            {selectedLabel && <BarcodePreview label={selectedLabel} />}
-          </div>
-          <div className="export-actions">
-            <div><p className="eyebrow">04 / FINISH</p><h2>Export or print</h2><p className="export-copy">Files are created only in this browser session. No values are uploaded, stored or logged by this application.</p></div>
-            <div className="action-grid">
-              <button className="button button-secondary" disabled={!selectedLabel?.valid || busy} onClick={() => selectedLabel && runExport(() => exportOne(selectedLabel, 'png'), 'PNG label downloaded.')}><span>▧</span> PNG</button>
-              <button className="button button-secondary" disabled={!selectedLabel?.valid || busy} onClick={() => selectedLabel && runExport(() => exportOne(selectedLabel, 'svg'), 'SVG label downloaded.')}><span>◇</span> SVG</button>
-              <button className="button button-secondary" disabled={!validLabels.length || busy} onClick={() => runExport(() => exportPdf(validLabels, activeProfile), 'PDF label pack downloaded.')}><span>▤</span> PDF pack</button>
-              <button className="button button-secondary" disabled={!validLabels.length || busy} onClick={() => runExport(() => exportZip(validLabels), 'ZIP with PNG and SVG labels downloaded.')}><span>⇩</span> ZIP pack</button>
-              <button className="button button-primary print-button" disabled={!validLabels.length || busy} onClick={printLabels}><span>⎙</span> Print labels</button>
-            </div>
-          </div>
+            <section className="panel label-area">
+              <div className="panel-heading labels-heading">
+                <div><p className="eyebrow">04 / ALL LABELS</p><h2>Label queue</h2></div>
+                <div className="queue-summary"><b>{filteredLabels.length}</b> shown <span /> <b>{validLabels.length}</b> valid <span /> <b className={invalidLabels ? 'warning' : ''}>{invalidLabels}</b> flagged</div>
+              </div>
+              <div className="label-grid" aria-live="polite">
+                {!labels.length && <div className="empty-state"><span className="empty-icon">▦</span><h3>Your label queue is waiting</h3><p>Add your values above or import an Excel, Word, Markdown or text file.</p></div>}
+                {!!labels.length && !filteredLabels.length && <div className="empty-state queue-empty"><span className="empty-icon">⌕</span><h3>No matching labels</h3><p>Clear the search or try a different part of the code.</p></div>}
+                {filteredLabels.map((label) => {
+                  const index = labels.findIndex((item) => item.id === label.id)
+                  return <button key={label.id} className={`label-card ${label.id === selectedLabel?.id ? 'selected' : ''} ${!label.valid ? 'invalid' : ''}`} onClick={() => setSelectedId(label.id)}>
+                    <span className="label-index">{String(index + 1).padStart(2, '0')}</span>
+                    <span className="format-chip">{formatNames[label.format]}</span>
+                    <BarcodePreview label={label} compact />
+                    <span className="label-value" title={label.value}>{label.value}</span>
+                    {!label.valid && <span className="validation-message">{label.error}</span>}
+                  </button>
+                })}
+              </div>
+            </section>
+          </section>
         </section>
 
         <p className="status-line" role="status"><span className={busy ? 'status-pulse' : 'status-dot'} />{busy ? 'Working locally…' : notice}</p>

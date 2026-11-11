@@ -104,6 +104,13 @@ export async function exportZip(labels: BarcodeLabel[]): Promise<void> {
 
 export async function exportPdf(labels: BarcodeLabel[], profile: LabelProfile): Promise<void> {
   const { jsPDF } = await import('jspdf')
+  const columns = profile.columns ?? 1
+  const rows = profile.rows ?? 1
+  const labelsPerPage = columns * rows
+  const labelWidth = profile.labelWidthMm ?? profile.widthMm
+  const labelHeight = profile.labelHeightMm ?? profile.heightMm
+  const horizontalGap = Math.max(0, (profile.widthMm - columns * labelWidth) / (columns + 1))
+  const verticalGap = Math.max(0, (profile.heightMm - rows * labelHeight) / (rows + 1))
   const pdf = new jsPDF({
     orientation: profile.widthMm > profile.heightMm ? 'landscape' : 'portrait',
     unit: 'mm',
@@ -111,14 +118,20 @@ export async function exportPdf(labels: BarcodeLabel[], profile: LabelProfile): 
   })
 
   for (const [index, label] of labels.entries()) {
-    if (index > 0) pdf.addPage([profile.widthMm, profile.heightMm])
+    if (index > 0 && index % labelsPerPage === 0) pdf.addPage([profile.widthMm, profile.heightMm])
+    const indexOnPage = index % labelsPerPage
+    const column = indexOnPage % columns
+    const row = Math.floor(indexOnPage / columns)
+    const x = horizontalGap + column * (labelWidth + horizontalGap)
+    const y = verticalGap + row * (labelHeight + verticalGap)
+    const padding = Math.min(3, labelWidth / 8, labelHeight / 8)
     const svg = await makeBarcodeSvg(label.value, label.format)
     const png = await svgToPngBlob(svg)
     const url = URL.createObjectURL(png)
     try {
       pdf.setFillColor(255, 255, 255)
-      pdf.rect(0, 0, profile.widthMm, profile.heightMm, 'F')
-      pdf.addImage(url, 'PNG', 3, 3, profile.widthMm - 6, profile.heightMm - 6, undefined, 'FAST')
+      if (indexOnPage === 0) pdf.rect(0, 0, profile.widthMm, profile.heightMm, 'F')
+      pdf.addImage(url, 'PNG', x + padding, y + padding, labelWidth - padding * 2, labelHeight - padding * 2, undefined, 'FAST')
     } finally {
       URL.revokeObjectURL(url)
     }

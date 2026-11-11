@@ -16,6 +16,11 @@ export interface LabelProfile {
   widthMm: number
   heightMm: number
   printerHint: string
+  printLayout?: 'single' | 'sheet'
+  labelWidthMm?: number
+  labelHeightMm?: number
+  columns?: number
+  rows?: number
 }
 
 export const labelProfiles: LabelProfile[] = [
@@ -46,5 +51,53 @@ export const labelProfiles: LabelProfile[] = [
     widthMm: 50,
     heightMm: 25,
     printerHint: 'Small product label',
+  },
+  {
+    id: 'a4-3x7',
+    name: 'A4 sheet — 21 labels (3 × 7)',
+    widthMm: 210,
+    heightMm: 297,
+    labelWidthMm: 63.5,
+    labelHeightMm: 38.1,
+    columns: 3,
+    rows: 7,
+    printLayout: 'sheet',
+    printerHint: 'Standard A4 printer paper · 21 compact labels per page',
+  },
+  {
+    id: 'a4-2x5',
+    name: 'A4 sheet — 10 labels (2 × 5)',
+    widthMm: 210,
+    heightMm: 297,
+    labelWidthMm: 96,
+    labelHeightMm: 52,
+    columns: 2,
+    rows: 5,
+    printLayout: 'sheet',
+    printerHint: 'Standard A4 printer paper · 10 large labels per page',
+  },
+  {
+    id: 'a5-2x4',
+    name: 'A5 sheet — 8 labels (2 × 4)',
+    widthMm: 148,
+    heightMm: 210,
+    labelWidthMm: 67,
+    labelHeightMm: 43,
+    columns: 2,
+    rows: 4,
+    printLayout: 'sheet',
+    printerHint: 'Compact A5 printer paper · 8 labels per page',
+  },
+  {
+    id: 'letter-3x10',
+    name: 'US Letter sheet — 30 labels (3 × 10)',
+    widthMm: 215.9,
+    heightMm: 279.4,
+    labelWidthMm: 66,
+    labelHeightMm: 24,
+    columns: 3,
+    rows: 10,
+    printLayout: 'sheet',
+    printerHint: 'US Letter printer paper · 30 address-size labels per page',
   },
 ]
